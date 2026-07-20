@@ -495,6 +495,57 @@ export type Database = {
         }
         Relationships: []
       }
+      period_summaries: {
+        Row: {
+          created_at: string
+          flagged_items: Json
+          id: string
+          location_id: string
+          organization_id: string
+          period_end: string
+          period_start: string
+          source: string
+          summary_text: string
+        }
+        Insert: {
+          created_at?: string
+          flagged_items?: Json
+          id?: string
+          location_id: string
+          organization_id: string
+          period_end: string
+          period_start: string
+          source: string
+          summary_text: string
+        }
+        Update: {
+          created_at?: string
+          flagged_items?: Json
+          id?: string
+          location_id?: string
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          source?: string
+          summary_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "period_summaries_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "period_summaries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

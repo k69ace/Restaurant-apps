@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { getUserLocations } from "@/lib/data/workspace";
-import { getEntriesInRange, summarizePeriod } from "@/lib/data/reporting";
-import { roundHalfUp } from "@/lib/calculations/labor";
+import { getEntriesInRange, summarizePeriod, getActiveTarget } from "@/lib/data/reporting";
+import { roundHalfUp, understaffingRisk, DEFAULT_UNDERSTAFFING_THRESHOLDS } from "@/lib/calculations/labor";
 import { PeriodControls } from "./PeriodControls";
 import { PeriodSummaryCard } from "./PeriodSummaryCard";
 import { ExportCsvButton } from "@/app/app/ExportCsvButton";
+import { getPeriodSummaryCached } from "@/app/actions/laborSummary";
+import { LaborSummaryPanel } from "./LaborSummaryPanel";
+import { createClient } from "@/lib/supabase/server";
 
 function defaultPeriods() {
   const endA = new Date();
@@ -54,6 +57,78 @@ export default async function PeriodPage({
   const summaryA = summarizePeriod(entriesA);
   const summaryB = summarizePeriod(entriesB);
 
+  const target = await getActiveTarget(selectedLocation.organizationId, selectedLocation.id, endA);
+  const supabase = await createClient();
+  const { data: orgSettings } = await supabase
+    .from("org_settings")
+    .select("guests_per_labor_hour_high_threshold, scheduled_vs_actual_variance_threshold_percent")
+    .eq("organization_id", selectedLocation.organizationId)
+    .maybeSingle();
+  const thresholds = orgSettings
+    ? {
+        guestsPerLaborHourHighThreshold: orgSettings.guests_per_labor_hour_high_threshold,
+        scheduledVsActualVarianceThresholdPercent:
+          orgSettings.scheduled_vs_actual_variance_threshold_percent,
+      }
+    : DEFAULT_UNDERSTAFFING_THRESHOLDS;
+
+  // Per-entry flag count for the summary panel. Simplified vs. the Daily
+  // Dashboard's per-daypart flag (which also checks hours-variance against
+  // a trailing-average forecast) — here only the guests/labor-hour signal
+  // is evaluated, since a period-level trailing-average-per-entry lookup
+  // isn't computed on this page. Illustrative for the summary, not the
+  // source of truth for any single day's flag.
+  const understaffingFlagCount = target
+    ? entriesA.filter(
+        (e) =>
+          understaffingRisk(
+            {
+              netSales: e.net_sales,
+              guestCount: e.guest_count,
+              scheduledHours: e.scheduled_hours,
+              actualHours: e.actual_hours,
+              scheduledLaborDollars: e.scheduled_labor_dollars,
+              regularLaborDollars: e.regular_labor_dollars,
+              overtimeHours: e.overtime_hours,
+              overtimeDollars: e.overtime_dollars,
+              fohLaborDollars: e.foh_labor_dollars,
+              bohLaborDollars: e.boh_labor_dollars,
+              managementLaborDollars: e.management_labor_dollars,
+            },
+            { targetTotalLaborPercent: target.target_total_labor_percent },
+            thresholds,
+          ).flagged,
+      ).length
+    : 0;
+
+  const laborSummary = await getPeriodSummaryCached(
+    selectedLocation.organizationId,
+    selectedLocation.id,
+    startA,
+    endA,
+    {
+      locationName: selectedLocation.name,
+      periodLabel: `${startA} to ${endA}`,
+      netSales: summaryA.calcInput.netSales,
+      laborDollars:
+        summaryA.calcInput.regularLaborDollars +
+        summaryA.calcInput.overtimeDollars +
+        summaryA.calcInput.managementLaborDollars,
+      laborPercent: summaryA.laborPercent,
+      targetPercent: target?.target_total_labor_percent ?? null,
+      splh: summaryA.splh,
+      otPercent: summaryA.otPercent,
+      fohLaborDollars: summaryA.calcInput.fohLaborDollars,
+      bohLaborDollars: summaryA.calcInput.bohLaborDollars,
+      managementLaborDollars: summaryA.calcInput.managementLaborDollars,
+      understaffingFlagCount,
+      comparison:
+        entriesB.length > 0
+          ? { periodLabel: `${startB} to ${endB}`, laborPercent: summaryB.laborPercent, netSales: summaryB.calcInput.netSales }
+          : undefined,
+    },
+  );
+
   return (
     <div>
       <h1 className="mb-1 text-xl font-semibold">Period Comparison</h1>
@@ -67,6 +142,8 @@ export default async function PeriodPage({
         startB={startB}
         endB={endB}
       />
+
+      <LaborSummaryPanel summary={laborSummary} />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <PeriodSummaryCard label={`Period A: ${startA} to ${endA}`} summary={summaryA} comparisonSummary={summaryB} />
