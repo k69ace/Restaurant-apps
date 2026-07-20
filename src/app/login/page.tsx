@@ -39,7 +39,10 @@ export default function LoginPage() {
       <h1 className="mb-1 text-2xl font-semibold">Labor Efficiency Calculator</h1>
       <p className="mb-8 text-sm text-muted">Sign in to your unKAGEd Hospitality account.</p>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+      {/* method="post" is defense-in-depth: a native fallback submission
+          (pre-hydration click, JS error) must never leak the password into
+          the URL via GET query params. See signup/page.tsx for details. */}
+      <form onSubmit={handleSubmit} method="post" action="" className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="email" className="text-sm font-medium">
             Email

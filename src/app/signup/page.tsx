@@ -88,7 +88,14 @@ export default function SignupPage() {
         you&apos;re in.
       </p>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+      {/* method="post" is a deliberate defense-in-depth measure: if this
+          form is ever submitted natively (e.g. a click landing before
+          client JS has hydrated, or a JS error), a GET would leak the
+          password into the URL — browser history, referrer headers,
+          server access logs. POST keeps it out of the URL even in that
+          fallback path; the real submission is always intercepted by
+          handleSubmit's preventDefault(). */}
+      <form onSubmit={handleSubmit} method="post" action="" className="flex flex-col gap-4" noValidate>
         <Field id="displayName" label="Your name" value={displayName} onChange={setDisplayName} />
         <Field
           id="email"
