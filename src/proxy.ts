@@ -5,7 +5,11 @@ import { NextResponse, type NextRequest } from "next/server";
 // components/actions always see a valid session. This does NOT do
 // authorization (role/permission checks) — those happen server-side per
 // route via lib/auth/requireRole and are additionally enforced by RLS.
-export async function middleware(request: NextRequest) {
+//
+// Next.js 16 renamed the `middleware.ts` file convention to `proxy.ts`
+// (the exported function is renamed the same way) — see
+// node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md.
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -27,7 +31,22 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+  const isAuthPage = pathname === "/login" || pathname === "/signup";
+  const isProtectedPage = pathname.startsWith("/app");
+
+  if (!user && isProtectedPage) {
+    const loginUrl = new URL("/login", request.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (user && isAuthPage) {
+    return NextResponse.redirect(new URL("/app", request.url));
+  }
 
   return response;
 }

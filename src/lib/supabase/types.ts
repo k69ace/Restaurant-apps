@@ -525,6 +525,13 @@ export type Database = {
         Args: { target_location: string }
         Returns: boolean
       }
+      create_organization_with_admin: {
+        Args: { location_name: string; org_name: string }
+        Returns: {
+          location_id: string
+          organization_id: string
+        }[]
+      }
       has_location_access: {
         Args: { target_location: string }
         Returns: boolean

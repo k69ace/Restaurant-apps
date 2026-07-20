@@ -1,18 +1,15 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+// eslint-config-next 16.x exports its flat config directly (an array of
+// flat-config objects) — there is no more `next/core-web-vitals` shareable
+// string to run through @eslint/eslintrc's FlatCompat, which is the
+// pre-flat-config pattern from earlier Next versions. Using FlatCompat here
+// double-wraps the plugin objects and produces a circular structure error
+// from newer ESLint versions.
+import nextConfig from "eslint-config-next";
 
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...nextConfig,
   {
-    ignores: ["supabase/migrations/**"],
+    ignores: ["supabase/migrations/**", "coverage/**"],
   },
 ];
 
