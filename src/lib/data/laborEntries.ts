@@ -74,22 +74,26 @@ export async function getActiveTarget(
   return locationScoped.data ?? orgWide.data ?? null;
 }
 
-/** Same-day-of-week trailing average net sales for a daypart, over the
- * trailing `weeks` occurrences before businessDate. Used both for the
- * dashboard comparison and as the understaffing flag's "forecast" proxy. */
-export async function getTrailingAverageNetSales(
+/** Raw entries for the same day-of-week as businessDate, over the trailing
+ * `weeks` occurrences strictly before it. This is the "trailing 4-week
+ * average for that day-of-week/daypart" baseline the brief's Review
+ * workflow and KPI cards both compare against — every KPI (Total Labor %,
+ * SPLH, Guests/Labor Hour, OT %) gets its own trailing-average version by
+ * aggregating these rows and computing the metric on the aggregate, not by
+ * averaging daily percentages (which would over-weight low-volume days). */
+export async function getTrailingSameWeekdayEntries(
   locationId: string,
   daypartId: string,
   businessDate: string,
   weeks = 4,
-): Promise<number | null> {
+): Promise<LaborEntryRow[]> {
   const supabase = await createClient();
   const startDate = new Date(businessDate);
   startDate.setDate(startDate.getDate() - 7 * weeks);
 
   const { data, error } = await supabase
     .from("labor_entries")
-    .select("net_sales, business_date")
+    .select("*")
     .eq("location_id", locationId)
     .eq("daypart_id", daypartId)
     .lt("business_date", businessDate)
@@ -99,11 +103,19 @@ export async function getTrailingAverageNetSales(
   if (error) throw error;
 
   const targetDayOfWeek = new Date(businessDate).getUTCDay();
-  const sameDayOfWeek = data.filter(
-    (row) => new Date(row.business_date).getUTCDay() === targetDayOfWeek,
-  );
-  if (sameDayOfWeek.length === 0) return null;
+  return data.filter((row) => new Date(row.business_date).getUTCDay() === targetDayOfWeek);
+}
 
-  const total = sameDayOfWeek.reduce((sum, row) => sum + row.net_sales, 0);
-  return total / sameDayOfWeek.length;
+/** Average net sales across getTrailingSameWeekdayEntries — the simpler
+ * figure the understaffing flag uses as its "forecast" proxy. */
+export async function getTrailingAverageNetSales(
+  locationId: string,
+  daypartId: string,
+  businessDate: string,
+  weeks = 4,
+): Promise<number | null> {
+  const rows = await getTrailingSameWeekdayEntries(locationId, daypartId, businessDate, weeks);
+  if (rows.length === 0) return null;
+  const total = rows.reduce((sum, row) => sum + row.net_sales, 0);
+  return total / rows.length;
 }
