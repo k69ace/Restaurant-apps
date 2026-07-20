@@ -26,6 +26,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link href="/app/trend" className="min-h-11 flex items-center px-1">
               Weekly Trend
             </Link>
+            <Link href="/app/period" className="min-h-11 flex items-center px-1">
+              Period Comparison
+            </Link>
+            <Link href="/app/analysis" className="min-h-11 flex items-center px-1">
+              Role/Daypart
+            </Link>
             <Link href="/app/settings" className="min-h-11 flex items-center px-1">
               Settings
             </Link>

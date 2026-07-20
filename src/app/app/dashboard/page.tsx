@@ -6,6 +6,8 @@ import { EntryControls } from "@/app/app/entry/EntryControls";
 import { KpiCard, formatDollarsPerHour, formatGuestsPerHour, formatPercent } from "./KpiCard";
 import { DaypartTable } from "./DaypartTable";
 import { PrintButton } from "./PrintButton";
+import { ExportCsvButton } from "@/app/app/ExportCsvButton";
+import { roundHalfUp, salesPerLaborHour, totalLaborPercent } from "@/lib/calculations/labor";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -96,6 +98,28 @@ export default async function DashboardPage({
             />
           </div>
 
+          <div className="no-print mb-2 flex justify-end">
+            <ExportCsvButton
+              filename={`daily-dashboard-${selectedLocation.name}-${businessDate}.csv`}
+              headers={["Daypart", "Status", "Net Sales", "Labor $", "Labor %", "SPLH", "Understaffing Flag"]}
+              rows={data.dayparts.map(({ daypart, entry, calcInput, understaffing }) => {
+                const laborPercent = calcInput ? totalLaborPercent(calcInput) : null;
+                const splh = calcInput ? salesPerLaborHour(calcInput, "actual") : null;
+                const laborDollars = calcInput
+                  ? calcInput.regularLaborDollars + calcInput.overtimeDollars + calcInput.managementLaborDollars
+                  : null;
+                return [
+                  daypart.label,
+                  entry ? entry.status : "No entry",
+                  entry ? roundHalfUp(entry.net_sales, 2) : "",
+                  laborDollars === null ? "" : roundHalfUp(laborDollars, 2),
+                  laborPercent === null ? "" : roundHalfUp(laborPercent * 100, 1),
+                  splh === null ? "" : roundHalfUp(splh, 2),
+                  understaffing?.flagged ? "Possible understaffing" : "",
+                ];
+              })}
+            />
+          </div>
           <DaypartTable rows={data.dayparts} />
 
           {data.dayparts.some((r) => r.understaffing?.flagged) && (
